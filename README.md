@@ -3,44 +3,44 @@
 # file data training
 https://www.kaggle.com/datasets/vanthonguyen123/viet-ocr
 # FUll code train
-import os
-import cv2
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-
-# ===== CHARSET =====
-def build_charset():
-    chars = list(
-        "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "0123456789"
-        "áàảãạăắằẳẵặâấầẩẫậ"
-        "đ"
-        "éèẻẽẹêếềểễệ"
-        "íìỉĩị"
-        "óòỏõọôốồổỗộơớờởỡợ"
-        "úùủũụưứừửữự"
-        "ýỳỷỹỵ"
-        " "
-    )
-    char2idx = {c: i+1 for i, c in enumerate(chars)}
-    idx2char = {i+1: c for i, c in enumerate(chars)}
-    return char2idx, idx2char
 
 
-# ===== DATASET =====
-class OCRDataset(Dataset):
-    def __init__(self, img_dir, label_file, char2idx):
-        self.samples = []
-        self.char2idx = char2idx
+    import os
+    import cv2
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import Dataset, DataLoader
+    import numpy as np
 
-        with open(label_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
+
+    def build_charset():
+        chars = list(
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789"
+            "áàảãạăắằẳẵặâấầẩẫậ"
+            "đ"
+            "éèẻẽẹêếềểễệ"
+            "íìỉĩị"
+            "óòỏõọôốồổỗộơớờởỡợ"
+            "úùủũụưứừửữự"
+            "ýỳỷỹỵ"
+            " "
+        )
+        char2idx = {c: i+1 for i, c in enumerate(chars)}
+        idx2char = {i+1: c for i, c in enumerate(chars)}
+        return char2idx, idx2char
+
+
+    class OCRDataset(Dataset):
+        def __init__(self, img_dir, label_file, char2idx):
+            self.samples = []
+            self.char2idx = char2idx
+         with open(label_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
 
                 parts = line.split(maxsplit=1)
                 if len(parts) < 2:
@@ -90,20 +90,20 @@ class OCRDataset(Dataset):
 
         return img, label, len(label)
 
+    
+    # ===== COLLATE =====
+    def collate_fn(batch):
+        imgs, labels, lengths = zip(*batch)
+        imgs = torch.stack(imgs)
+        labels = torch.cat(labels)
+        lengths = torch.tensor(lengths)
+        return imgs, labels, lengths
 
-# ===== COLLATE =====
-def collate_fn(batch):
-    imgs, labels, lengths = zip(*batch)
-    imgs = torch.stack(imgs)
-    labels = torch.cat(labels)
-    lengths = torch.tensor(lengths)
-    return imgs, labels, lengths
-
-
-# ===== MODEL =====
-class CRNN(nn.Module):
-    def __init__(self, num_classes):
-        super().__init__()
+    
+    # ===== MODEL =====
+    class CRNN(nn.Module):
+        def __init__(self, num_classes):
+            super().__init__()
 
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 64, 3, padding=1),
@@ -131,43 +131,42 @@ class CRNN(nn.Module):
 
         return x
 
-
-# ===== PATH =====
-DATA_PATH = "/content/data"
-
-
-# ===== MAIN =====
-device = torch.device("cuda")
-print("Device:", device)
-
-char2idx, idx2char = build_charset()
-num_classes = len(char2idx) + 1
-
-dataset = OCRDataset(
-    os.path.join(DATA_PATH, "images"),
-    os.path.join(DATA_PATH, "train_gt.txt"),
-    char2idx
-)
-
-loader = DataLoader(
-    dataset,
-    batch_size=32,
-    shuffle=True,
-    collate_fn=collate_fn,
-    num_workers=2
-)
-
-model = CRNN(num_classes).to(device)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-criterion = nn.CTCLoss(blank=0)
+        
+    DATA_PATH = "/content/data"
 
 
-# ===== TRAIN =====
-loss_history = []  # 🔥 thêm
-
-for epoch in range(8):
-    print(f"\nEpoch {epoch}")
+    
+    device = torch.device("cuda")
+    print("Device:", device)
+    
+    char2idx, idx2char = build_charset()
+    num_classes = len(char2idx) + 1
+    
+    dataset = OCRDataset(
+        os.path.join(DATA_PATH, "images"),
+        os.path.join(DATA_PATH, "train_gt.txt"),
+        char2idx
+    )
+    
+    loader = DataLoader(
+        dataset,
+        batch_size=32,
+        shuffle=True,
+        collate_fn=collate_fn,
+        num_workers=2
+    )
+    
+    model = CRNN(num_classes).to(device)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.CTCLoss(blank=0)
+    
+    
+    # ===== TRAIN =====
+    loss_history = []  
+    
+    for epoch in range(8):
+        print(f"\nEpoch {epoch}")
 
     for i, (imgs, labels, label_lengths) in enumerate(loader):
 
@@ -202,6 +201,6 @@ for epoch in range(8):
 
 
 
-np.save("/content/loss.npy", np.array(loss_history))
-
-print("✅ Saved model + loss")
+    np.save("/content/loss.npy", np.array(loss_history))
+    
+    print("Saved model + loss")
